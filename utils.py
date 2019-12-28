@@ -1,3 +1,5 @@
+import pdb
+from itertools import chain
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -12,22 +14,55 @@ def plot_test_predictions(predictions):
 
 
 def get_true_positives(predictions):
-    return np.array([prediction[0].cpu().numpy().squeeze(0) for prediction in predictions if prediction[1].item() == 1])
+    p = []
+    for batch_predictions in predictions:
+        points = batch_predictions[0]
+        labels = batch_predictions[1]
+        for point, label in zip(points, labels):
+            if label.item() == 1:
+                p.append(point.cpu().numpy())
+    return np.array(p)
 
 
 def get_false_positives(predictions):
-    return np.array([prediction[0].cpu().numpy().squeeze(0) for prediction in predictions if prediction[1].item() == 0])
+    p = []
+    for batch_predictions in predictions:
+        points = batch_predictions[0]
+        labels = batch_predictions[1]
+        for point, label in zip(points, labels):
+            if label.item() == 0:
+                p.append(point.cpu().numpy())
+    return np.array(p)
 
 
 def get_true_negatives(predictions):
-    return np.array([prediction[0].cpu().numpy().squeeze(0) for prediction in predictions if prediction[1].item() == 0])
+    p = []
+    for batch_predictions in predictions:
+        points = batch_predictions[0]
+        labels = batch_predictions[1]
+        for point, label in zip(points, labels):
+            if label.item() == 0:
+                p.append(point.cpu().numpy())
+    return np.array(p)
 
 
 def get_false_negatives(predictions):
-    return np.array([prediction[0].cpu().numpy().squeeze(0) for prediction in predictions if prediction[1].item() == 1])
+    p = []
+    for batch_predictions in predictions:
+        points = batch_predictions[0]
+        labels = batch_predictions[1]
+        for point, label in zip(points, labels):
+            if label.item() == 1:
+                p.append(point.cpu().numpy())
+    return np.array(p)
 
 
 def plot_predictions(inlier_predictions, outlier_predictions):
+    """
+    Each "prediction" is of the form data, label tuple
+    :param inlier_predictions: Predictions on training data (should be inliers)
+    :param outlier_predictions: Predictions on test data (should be outliers)
+    """
     correct_inlier_predictions = get_true_positives(inlier_predictions)
     wrong_inlier_predictions = get_false_positives(inlier_predictions)
 
@@ -40,3 +75,13 @@ def plot_predictions(inlier_predictions, outlier_predictions):
     plt.scatter(wrong_outlier_predictions[:, 0], wrong_outlier_predictions[:, 1], label="false outliers")
     plt.legend()
     plt.show()
+
+
+def get_inlier_percentage(predictions):
+    num_inliers = 0
+    num_labels = 0
+    for batch_predictions in predictions:
+        labels = batch_predictions[1]
+        num_inliers += labels.sum().item()
+        num_labels += labels.shape[0]
+    return float(num_inliers) / num_labels

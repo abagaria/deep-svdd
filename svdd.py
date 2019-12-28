@@ -21,7 +21,7 @@ class SVDD(object):
             net: The neural network \phi.
         """
 
-    def __init__(self, nu=0.01, device=torch.device("cuda")):
+    def __init__(self, in_dim, nu=0.01, device=torch.device("cuda"), tensor_log=False):
         """Initialize DeepSVDD with one of the two objectives and hyperparameter nu."""
         assert (0 < nu) & (nu <= 1), "For hyperparameter nu, it must hold: 0 < nu <= 1."
 
@@ -30,15 +30,17 @@ class SVDD(object):
         self.c = None  # hypersphere center c
 
         self.device = device
-        self.model = DenseOneClassModel(input_dim=2, device=device)
+        self.model = DenseOneClassModel(input_dim=in_dim, device=device)
 
         # Logging
-        self.writer = SummaryWriter()
+        self.tensor_log = tensor_log
+        if tensor_log:
+            self.writer = SummaryWriter()
 
     def pretrain(self):
         pass
 
-    def fit(self, loader, n_epochs=10):
+    def fit(self, loader, n_epochs=150):
         optimizer = optim.Adam(self.model.parameters(), lr=1e-3, weight_decay=1e-6)
 
         n_iterations = 0
@@ -66,14 +68,16 @@ class SVDD(object):
                 loss.backward()
                 optimizer.step()
 
-                if epoch >= 1:
+                if epoch > 5:
                     self.R = torch.tensor(get_radius(distance, self.nu), device=self.device)
 
                 # Logging
                 n_iterations = n_iterations + 1
-                self.writer.add_scalar("Loss", loss.item(), n_iterations)
-                self.writer.add_scalar("Radius", self.R, n_iterations)
-                self.writer.add_scalar("Average-Scores", scores.mean(), n_iterations)
+
+                if self.tensor_log:
+                    self.writer.add_scalar("Loss", loss.item(), n_iterations)
+                    self.writer.add_scalar("Radius", self.R, n_iterations)
+                    self.writer.add_scalar("Average-Scores", scores.mean(), n_iterations)
 
     def predict(self, data):
         self.model.eval()
@@ -126,16 +130,20 @@ def get_radius(dist, nu):
 
 
 if __name__ == "__main__":
-    train_set = ToyDataset("train")
-    train_set = DataLoader(train_set, shuffle=True, batch_size=1)
-    svdd = SVDD()
+    n_dims = 2
+    train_set = ToyDataset(n_dims, "train")
+    train_set = DataLoader(train_set, shuffle=True, batch_size=16)
+    svdd = SVDD(n_dims, device="cpu")
 
-    test_set = ToyDataset("test")
-    test_set = DataLoader(test_set, shuffle=True, batch_size=1)
+    test_set = ToyDataset(n_dims, "test")
+    test_set = DataLoader(test_set, shuffle=True, batch_size=8)
 
     svdd.fit(train_set)
 
     train_predictions = svdd.test(train_set)
     test_predictions = svdd.test(test_set)
+
+    print("[Training Data] Inlier percentage: ", get_inlier_percentage(train_predictions))
+    print("[Test Data] Inlier percentage: ", get_inlier_percentage(test_predictions))
 
     plot_predictions(train_predictions, test_predictions)
